@@ -1,0 +1,19 @@
+{
+  "name": "requestid-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Demo project showcasing @mohammed_kashif/requestid",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "demo": "node scripts/demo.js",
+    "standalone": "node scripts/standalone.js"
+  },
+  "dependencies": {
+    "@mohammed_kashif/requestid": "^1.0.0",
+    "express": "^4.21.2"
+  }
+}

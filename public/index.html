@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>requestid playground</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #fff; --ink: #1b1f24; --muted: #667085; --line: #e4e7ec;
+    --accent: #3b5bdb; --ok: #2b8a3e; --bad: #c92a2a; --code: #f1f3f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f1115; --panel:#171a21; --ink:#e6e8eb; --muted:#8b93a1; --line:#262b35;
+            --accent:#7c94ff; --ok:#51cf66; --bad:#ff6b6b; --code:#1f232c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--ink); }
+  header { padding: 28px 16px 8px; max-width: 1100px; margin: auto; }
+  header h1 { margin: 0; font-size: 24px; }
+  header p { margin: 4px 0 0; color: var(--muted); }
+  main { max-width: 1100px; margin: auto; padding: 16px; display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+  section.wide { grid-column: 1 / -1; }
+  h2 { margin: 0 0 4px; font-size: 16px; }
+  .sub { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+  code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  pre { background: var(--code); padding: 10px; border-radius: 6px; overflow-x: auto; margin: 8px 0 0; white-space: pre-wrap; word-break: break-all; }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 7px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  input, select { font: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); min-width: 0; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .chip { background: var(--code); color: var(--ink); border: 1px solid var(--line); }
+  .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  #logs { height: 320px; overflow-y: auto; background: var(--code); border-radius: 6px; padding: 8px; }
+  #logs div { white-space: nowrap; }
+  .svc { color: var(--muted); display: inline-block; width: 80px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>@mohammed_kashif/requestid playground</h1>
+  <p>Every request deserves an identity. Try each option, then watch one ID travel across two services.</p>
+</header>
+<main>
+  <section>
+    <h2>1 · Strategies &amp; options</h2>
+    <p class="sub">Each button hits a router mounted with a different <code>requestId()</code> config.</p>
+    <div class="chips" id="chips"></div>
+    <div class="row">
+      <input id="incoming" placeholder="X-Request-ID to send (for incoming modes)" style="flex:1" />
+      <button id="send">Send request</button>
+    </div>
+    <pre id="stratOut">Pick a strategy…</pre>
+  </section>
+
+  <section>
+    <h2>2 · Validate an incoming ID</h2>
+    <p class="sub"><code>validateRequestId()</code> — allowlist <code>a-z A-Z 0-9 _ - . :</code>, max 128 chars.</p>
+    <div class="row">
+      <input id="valIn" value="trace-abc:123" style="flex:1" />
+      <button id="valBtn">Validate</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="ghost" data-sample="hello world">space</button>
+      <button class="ghost" data-sample="id\nFAKE LOG LINE">newline injection</button>
+      <button class="ghost" data-sample="__LONG__">200 chars</button>
+      <button class="ghost" data-sample="<script>">html</button>
+    </div>
+    <pre id="valOut"></pre>
+  </section>
+
+  <section>
+    <h2>3 · Standalone generator</h2>
+    <p class="sub"><code>createRequestIdGenerator()</code> — IDs for jobs, queues, CLIs, outside Express.</p>
+    <div class="row">
+      <select id="genStrat"><option>uuid</option><option selected>nanoid</option></select>
+      <input id="genPrefix" value="job" placeholder="prefix" style="width:100px" />
+      <input id="genCount" type="number" value="5" min="1" max="50" style="width:70px" />
+      <button id="genBtn">Generate</button>
+    </div>
+    <pre id="genOut"></pre>
+  </section>
+
+  <section>
+    <h2>4 · Config errors fail fast</h2>
+    <p class="sub">Bad options throw when <code>requestId()</code> is called — at startup, not on the first request.</p>
+    <button id="cfgBtn">Show what bad configs throw</button>
+    <pre id="cfgOut"></pre>
+  </section>
+
+  <section class="wide">
+    <h2>5 · Tracing across services</h2>
+    <p class="sub">
+      Gateway (<code>prefix:"req", strategy:"nanoid"</code>) assigns an ID and forwards it to the inventory service
+      (<code>useIncoming:true</code>). Fire several orders at once — the logs interleave, but each line is tagged.
+    </p>
+    <div class="row">
+      <button id="one">1 order</button>
+      <button id="five">5 concurrent orders</button>
+      <button id="fail" class="ghost">failing order</button>
+      <button id="clear" class="ghost">clear</button>
+      <label class="row" style="gap:4px;font-size:13px"><input type="checkbox" id="filterOn" /> show only
+        <input id="filterId" placeholder="request id" style="width:220px" /></label>
+    </div>
+    <pre id="orderOut" style="max-height:160px"></pre>
+    <div id="logs" class="mono" style="margin-top:8px"></div>
+  </section>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const show = (el, v) => ($(el).textContent = typeof v === "string" ? v : JSON.stringify(v, null, 2));
+const palette = ["#1c7ed6", "#e8590c", "#9c36b5", "#2b8a3e", "#c2255c", "#0c8599", "#5f3dc4"];
+const colorFor = (id) => { let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0; return palette[h % palette.length]; };
+
+// 1 — strategies
+let current = "uuid";
+fetch("/api/strategies").then((r) => r.json()).then((list) => {
+  for (const s of list) {
+    const b = document.createElement("button");
+    b.className = "chip" + (s.key === current ? " active" : "");
+    b.textContent = s.title;
+    b.onclick = () => { current = s.key; document.querySelectorAll(".chip").forEach((c) => c.classList.toggle("active", c === b)); send(); };
+    $("#chips").append(b);
+  }
+});
+async function send() {
+  const headers = {};
+  const v = $("#incoming").value;
+  if (v) headers["X-Request-ID"] = v;
+  const r = await fetch(`/api/strategies/${current}`, { headers });
+  const headerDump = [...r.headers].filter(([k]) => k.startsWith("x-")).map(([k, v]) => `${k}: ${v}`).join("\n") || "(no x-* headers)";
+  const body = await r.text();
+  show("#stratOut", `HTTP ${r.status}\n${headerDump}\n\n${(() => { try { return JSON.stringify(JSON.parse(body), null, 2); } catch { return body; } })()}`);
+}
+$("#send").onclick = send;
+
+// 2 — validate
+async function validate() {
+  const r = await fetch("/api/validate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: $("#valIn").value.replace(/\\n/g, "\n") }) });
+  const j = await r.json();
+  $("#valOut").innerHTML = "";
+  const span = document.createElement("span");
+  span.className = j.valid ? "ok" : "bad";
+  span.textContent = j.valid ? "✓ valid" : `✗ invalid — ${j.reason}`;
+  $("#valOut").append(span);
+}
+$("#valBtn").onclick = validate;
+document.querySelectorAll("[data-sample]").forEach((b) => (b.onclick = () => {
+  $("#valIn").value = b.dataset.sample === "__LONG__" ? "a".repeat(200) : b.dataset.sample;
+  validate();
+}));
+
+// 3 — generate
+$("#genBtn").onclick = async () => {
+  const q = new URLSearchParams({ strategy: $("#genStrat").value, prefix: $("#genPrefix").value, count: $("#genCount").value });
+  const j = await (await fetch(`/api/generate?${q}`)).json();
+  show("#genOut", j.error ?? j.ids.join("\n"));
+};
+
+// 4 — config errors
+$("#cfgBtn").onclick = async () => {
+  const j = await (await fetch("/api/config-errors")).json();
+  show("#cfgOut", j.map((e) => `${JSON.stringify(e.options)}\n  → ${e.error}`).join("\n\n"));
+};
+
+// 5 — tracing
+let since = new Date().toISOString();
+const seen = [];
+function renderLogs() {
+  const f = $("#filterOn").checked && $("#filterId").value.trim();
+  $("#logs").innerHTML = "";
+  for (const l of seen) {
+    if (f && l.requestId !== f) continue;
+    const d = document.createElement("div");
+    const svc = document.createElement("span"); svc.className = "svc"; svc.textContent = l.service;
+    const id = document.createElement("span"); id.style.color = colorFor(l.requestId); id.style.cursor = "pointer";
+    id.textContent = `[${l.requestId}]`; id.title = "click to filter";
+    id.onclick = () => { $("#filterId").value = l.requestId; $("#filterOn").checked = true; renderLogs(); };
+    const msg = document.createElement("span");
+    msg.textContent = ` ${l.level === "error" ? "ERROR " : ""}${l.message}${l.qty !== undefined ? ` (qty ${l.qty})` : ""}`;
+    if (l.level === "error") msg.className = "bad";
+    d.append(svc, id, msg);
+    $("#logs").append(d);
+  }
+  $("#logs").scrollTop = $("#logs").scrollHeight;
+}
+async function pollLogs() {
+  const j = await (await fetch(`/api/logs?since=${encodeURIComponent(since)}`)).json();
+  if (j.length) { since = j[j.length - 1].time; seen.push(...j); renderLogs(); }
+}
+setInterval(pollLogs, 400);
+$("#filterOn").onchange = renderLogs;
+$("#filterId").oninput = renderLogs;
+$("#clear").onclick = () => { seen.length = 0; renderLogs(); show("#orderOut", ""); };
+
+async function order(id) {
+  const r = await fetch(`/api/orders/${id}`);
+  return { status: r.status, header: r.headers.get("x-request-id"), body: await r.json() };
+}
+$("#one").onclick = async () => show("#orderOut", await order("A-100"));
+$("#five").onclick = async () => {
+  const res = await Promise.all(["A-1", "A-2", "A-3", "A-4", "A-5"].map(order));
+  show("#orderOut", res.map((r) => `${r.body.orderId}  →  ${r.header}   (inventory saw: ${r.body.items.map((i) => i.requestId).join(", ")})`).join("\n"));
+};
+$("#fail").onclick = async () => show("#orderOut", await order("fail"));
+</script>
+</body>
+</html>
